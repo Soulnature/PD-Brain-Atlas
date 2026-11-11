@@ -26,6 +26,14 @@
   const PMM = PM.molecules || {};
   const pmGet = (m) => PMM[molKey(m)] || PMM[String(m || "").trim()] || null;
   const PATHWAYS = Object.keys(PM.pathways || {}).sort();
+  // ParkDB (Brain 2026): prefrontal bulk RNA-seq, contrasts "D1:PD" -> [log2FC, padj]
+  const PK = D.parkdb || {};
+  const pkGet = (m) => (PK.genes || {})[molKey(m)] || null;
+  // PD genetics: GWAS Locus Browser (IPDGC/GP2) + GWAS Catalog
+  const GN = D.genetics || {};
+  const gnGet = (m) => (GN.genes || {})[molKey(m)] || null;
+  const isRisk = (g) => g && (g.m || g.n || (g.c && g.c[0] > 0));
+  const PFC = ["superiorfrontal", "rostralmiddlefrontal", "caudalmiddlefrontal"].flatMap((p) => [`ctx_L_${p}`, `ctx_R_${p}`]);
   const evByRegion = {};
   D.evidence.forEach((e) => (evByRegion[e.region_id] = evByRegion[e.region_id] || []).push(e));
 
@@ -47,6 +55,12 @@
     return Object.fromEntries(Object.entries(sets).map(([r, s]) => [r, s.size]));
   }
   function mapSpec() {
+    if (state.map === "genetics") {
+      const sets = {};
+      LIT.forEach((f) => { if (isRisk(gnGet(f.molecule))) f.regions.forEach((r) => (sets[r] = sets[r] || new Set()).add(molKey(f.molecule))); });
+      const values = Object.fromEntries(Object.entries(sets).map(([r, s]) => [r, s.size]));
+      return { kind: "count", label: "PD genetic risk genes with published findings", values, max: Math.max(1, ...Object.values(values)) };
+    }
     if (state.map === "pathway") {
       const values = pathwayValues(state.pathway);
       return { kind: "count", label: `PD map ${state.pathway}: pathway molecules with findings`, values, max: Math.max(1, ...Object.values(values)) };
@@ -62,6 +76,8 @@
     (litByMol[molKey(state.molecule)] || []).forEach((f) => {
       if (f.regions.some((r) => rids.includes(r))) (f.approximate_region ? broad : exact).add(f.direction);
     });
+    const pk = pkGet(state.molecule);  // replicated ParkDB PD change -> prefrontal parcels (broad: lobe-level tissue)
+    if (pk && pk.rep && rids.some((r) => PFC.includes(r))) broad.add((pk.c["D1:PD"] || [0])[0] > 0 ? "increased" : "decreased");
     return { exact, broad };
   }
   const tint = (hex, w) => rgbToHex(hexToRgb(hex).map((v) => Math.max(0, w >= 0 ? v + (255 - v) * w : v * (1 + w))));
@@ -84,7 +100,7 @@
     if (!vs.length) return { color: null, label: "no data" };
     if (spec.kind === "count") {
       const v = Math.max(...vs);
-      return { color: ramp(SEQ, Math.sqrt(v / spec.max)), label: state.map === "pathway" ? `${v} pathway molecule${v === 1 ? "" : "s"} reported` : `${v} finding${v === 1 ? "" : "s"}` };
+      return { color: ramp(SEQ, Math.sqrt(v / spec.max)), label: state.map === "pathway" || state.map === "genetics" ? `${v} ${state.map === "genetics" ? "risk gene" : "pathway molecule"}${v === 1 ? "" : "s"} reported` : `${v} finding${v === 1 ? "" : "s"}` };
     }
     const v = vs[0];
     if (spec.kind === "ordinal") return { color: SEQ[Math.round(v) - 1], label: `Braak R${v}` };
@@ -191,6 +207,28 @@
       <div><b>Interaction partners:</b> ${m.pa.map((x) => `<span class="mol" data-mol="${esc(x)}">${esc(x)}</span>`).join(", ") || "—"}</div>
       <div class="ref"><a href="${pmLink(mol)}" target="_blank" rel="noopener noreferrer">Open in the PD map</a> · ${esc(PM.licence || "")}</div></div>`;
   }
+  function geneticsHtml(mol) {
+    const g = gnGet(mol);
+    if (!GN.genes) return "";
+    if (!g) return `<h3>PD genetics</h3><p class="muted">No PD GWAS locus within 1 Mb, no GWAS Catalog PD association, not on the PD gene list.</p>`;
+    const tags = [g.m ? `<span class="dir mixed">known PD gene</span>` : "", g.n ? `<span class="chip">nominated by Nalls 2019</span>` : ""].join(" ");
+    const loci = g.l.map(([gw, name, snp, sc]) => `<div>${esc(gw)} · locus <b>${esc(name)}</b> (${esc(snp)}) · browser evidence score ${esc(sc)}</div>`).join("");
+    const cat = g.c ? `<div><b>GWAS Catalog:</b> ${g.c[0]} genome-wide significant PD associations in ${g.c[3]} studies; strongest ${esc(g.c[2] || "")} p = ${esc(Number(g.c[1]).toPrecision(2))}${g.c[5].length ? ` · ${esc(g.c[5].join(", "))}` : ""} · ${g.c[4].map(pubmed).join(", ")}</div>` : "";
+    return `<h3>PD genetics</h3><div class="finding">${tags}${loci}${cat}<div class="ref">Locus proximity is not causality. ${esc(Object.values(GN.sources || {}).join(" · "))}</div></div>`;
+  }
+  function parkdbHtml(mol) {
+    const g = pkGet(mol);
+    if (!PK.genes) return "";
+    if (!g) return `<h3>ParkDB · prefrontal cortex RNA-seq</h3><p class="muted">Not differentially expressed in PD (padj ≥ 0.05 in both datasets) or not measured.</p>`;
+    const order = ["PD", "DLB", "MSA", "PSP", "CBD", "AD"];
+    const rows = order.flatMap((d) => ["D1", "D2"].map((s) => [`${s}:${d}`, g.c[`${s}:${d}`]])).filter(([, v]) => v);
+    return `<h3>ParkDB · prefrontal cortex RNA-seq</h3>
+      <p class="muted">${g.rep ? "<b>Replicated PD change</b> (padj &lt; 0.05 in both datasets, same direction)." : "PD change not replicated across the two datasets."}
+      log2FC &gt; 0 = higher in disease; bulk tissue.</p><table><thead><tr><th>Contrast</th><th>n</th><th>log2FC</th><th>padj</th></tr></thead><tbody>` +
+      rows.map(([k, [lfc, q]]) => `<tr><td>${esc(k.replace("D1:", "Dataset 1 · ").replace("D2:", "Dataset 2 · "))} vs control</td><td class="muted">${esc((PK.groups[k] || []).join("/"))}</td>
+        <td>${q < 0.05 ? dirChip(lfc > 0 ? "increased" : "decreased") : ""} ${lfc.toFixed(2)}</td><td>${esc(q)}</td></tr>`).join("") +
+      `</tbody></table><div class="ref">${esc(PK.source || "")}</div>`;
+  }
   function regionPathways(lit) {
     const c = {};
     const mols = new Set(lit.map((f) => molKey(f.molecule)));
@@ -224,6 +262,8 @@
       `<div class="finding"><b>${esc(e.feature)}</b>: ${esc(typeof e.value === "number" ? e.value.toFixed(3) : e.value)} ${e.p != null ? `(p = ${esc(Number(e.p).toPrecision(2))})` : ""} <span class="ref">${esc(e.source)} · n ${esc(e.n)}</span></div>`).join("");
     if (lit.length) h += `<h3>Published PD tissue findings</h3>` + lit.map((f) => findingHtml(f, true)).join("");
     h += regionPathways(lit);
+    const risk = [...new Set(lit.map((f) => molKey(f.molecule)))].filter((k) => isRisk(gnGet(k)));
+    if (risk.length) h += `<h3>PD genetic risk genes reported here</h3><div>${risk.map((k) => `<span class="mol" data-mol="${esc(k)}">${esc(k)}</span>${gnGet(k).m ? "*" : ""}`).join(", ")}</div><p class="muted">* known PD gene; others: GWAS locus genes (GWAS Locus Browser / GWAS Catalog).</p>`;
     const cm = ev.filter((e) => e.grade === "curated_mechanism");
     if (cm.length) h += `<h3>PD map cell-type links</h3>` + cm.map((e) =>
       `<div class="finding"><b>${esc(e.feature)}</b> <span class="muted">(${esc(e.value)} molecules; ${esc(e.method)})</span><div class="ref">${esc(e.note)}</div></div>`).join("");
@@ -247,9 +287,11 @@
     if (Object.keys(byRegion).length) h += `<h3>By region</h3><table><tbody>` + Object.entries(byRegion).sort().map(([r, ds]) =>
       `<tr><td>${esc(r)}</td><td>${[...new Set(ds)].map(dirChip).join(" ")}</td><td class="muted">${ds.length}</td></tr>`).join("") + `</tbody></table>`;
     if (extra.length) h += `<h3>Biomni-PD analyses</h3>` + extra.map((e) => `<div class="finding"><b>${esc(REG[e.region_id].name)}</b>: ${esc(e.feature)} ${e.direction ? dirChip(e.direction) : ""}<div class="ref">${esc(e.source)}</div></div>`).join("");
+    h += geneticsHtml(mol);
+    h += parkdbHtml(mol);
     h += pdmapHtml(mol);
     if (fs.length) h += `<h3>Published findings</h3>` + fs.map((f) => findingHtml(f, true)).join("");
-    if (!fs.length && !extra.length && !pmGet(mol)) h += `<p>No region-level PD tissue findings for “${esc(mol)}” in this atlas yet.</p>`;
+    if (!fs.length && !extra.length && !pmGet(mol) && !pkGet(mol) && !gnGet(mol)) h += `<p>No region-level PD tissue findings for “${esc(mol)}” in this atlas yet.</p>`;
     $("panel").innerHTML = h;
     $("panel").scrollTop = 0;
   }
@@ -288,6 +330,7 @@
   function fillMapSelect() {
     mapSel.innerHTML = (state.molecule ? `<option value="molecule">${esc(state.molecule)}: direction by region</option>` : "") +
       (state.pathway ? `<option value="pathway">PD map: ${esc(state.pathway)}</option>` : "") +
+      (GN.genes ? `<option value="genetics">Genetics: PD risk genes with findings</option>` : "") +
       Object.entries(D.maps).map(([k, m]) => `<option value="${esc(k)}">${esc(m.label)}</option>`).join("");
     mapSel.value = state.map;
   }
@@ -347,7 +390,7 @@
     const ql = q.toLowerCase();
     if (meshByName[ql]) return showRegions(meshByName[ql].regions, meshByName[ql].name);
     if (regionByName[ql]) return showRegions([regionByName[ql]]);
-    if (litByMol[molKey(q)] || pmGet(q)) return setMolecule(q);
+    if (litByMol[molKey(q)] || pmGet(q) || pkGet(q) || gnGet(q)) return setMolecule(q);
     const pwHit = PATHWAYS.find((p) => p.toLowerCase() === ql);
     if (pwHit) return setPathway(pwHit);
     const part = D.regions.filter((r) => r.name.toLowerCase().includes(ql));
@@ -410,7 +453,7 @@
     if (h.get("mol")) setMolecule(h.get("mol"));
     if (h.get("pathway")) setPathway(h.get("pathway"));
     if (h.get("region")) { $("q").value = h.get("region"); onSearch(); }
-    if (h.get("map") && (D.maps[h.get("map")] || h.get("map") === "molecule")) { state.map = h.get("map"); fillMapSelect(); recolor(); }
+    if (h.get("map") && (D.maps[h.get("map")] || ["molecule", "genetics"].includes(h.get("map")))) { state.map = h.get("map"); fillMapSelect(); recolor(); }
     if (h.get("view")) { $("view").value = h.get("view"); setView(h.get("view")); }
   }
   window.addEventListener("hashchange", fromHash);
