@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PD Brain Atlas · Biomni-PD</title>
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=40e3821da944">
 <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
-<script src="data.js"></script>
+<script src="data.js?v=fc471914b18c"></script>
 </head>
 <body>
 <header>
@@ -47,6 +47,14 @@
   <span id="stats" class="muted"></span>
 </section>
 
+<nav class="evidence-nav" aria-label="Explore evidence sources">
+  <strong>Explore evidence</strong>
+  <a href="#mol=SNCA&amp;section=genetics" data-evidence-section>PD genetics · GWAS</a>
+  <a href="#mol=SNCA&amp;section=parkdb" data-evidence-section>ParkDB · RNA-seq</a>
+  <a href="#mol=SNCA&amp;section=mechanisms" data-evidence-section>PD map · mechanisms</a>
+  <span class="muted">Start with SNCA, then search any gene to compare its evidence.</span>
+</nav>
+
 <main>
   <div class="viewer">
     <div id="brain" role="img" aria-label="3D brain with PD evidence by region"></div>
@@ -60,6 +68,7 @@
     <div class="placeholder">
       <h2>Start here</h2>
       <ul>
+        <li><b>Explore evidence above</b> to open genetic associations, ParkDB expression results or PD map mechanisms for an example gene.</li>
         <li><b>Click a region</b> on the brain to list the PD findings reported in it.</li>
         <li><b>Search a molecule</b> to colour every region by the direction it was reported to change in (increased, decreased, no change).</li>
         <li>Every published finding links to its PubMed entry. The sentence quoted from the abstract was checked automatically.</li>
@@ -101,6 +110,6 @@
   <p><b>How to read this.</b> Published findings come from human post-mortem PD studies, extracted from Europe PMC abstracts. Each one is kept only if its quoted sentence appears verbatim in the abstract. Prefrontal transcriptomes across parkinsonian disorders come from ParkDB (Brain 2026). Mechanism pathways come from the PD map (LCSB, University of Luxembourg, CC BY 4.0). Imaging effect sizes are from ENIGMA-PD (Laansma et al. 2021), and Braak stage-related regions follow Keo et al. 2020. Region mapping is approximate wherever a paper reports a lobe or a broad area. Co-location of findings is an association, not evidence of mechanism. This site is for research use only, not for clinical use.</p>
   <p id="sources" class="muted"></p>
 </footer>
-<script src="app.js"></script>
+<script src="app.js?v=bcfc57964a0c"></script>
 </body>
 </html>

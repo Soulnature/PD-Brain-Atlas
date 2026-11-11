@@ -199,8 +199,8 @@
   const pmLink = (q) => `https://pdmap.uni.lu/minerva/index.xhtml?id=${encodeURIComponent(PM.project || "")}&search=${encodeURIComponent(q)}`;
   function pdmapHtml(mol) {
     const m = pmGet(mol);
-    if (!m) return PM.project ? `<h3>PD map mechanisms</h3><p class="muted">Not curated in the PD map (${esc(PM.project)}).</p>` : "";
-    return `<h3>PD map mechanisms</h3>
+    if (!m) return PM.project ? `<h3 id="detail-mechanisms">PD map mechanisms</h3><p class="muted">Not curated in the PD map (${esc(PM.project)}).</p>` : "";
+    return `<h3 id="detail-mechanisms">PD map mechanisms</h3>
       <div class="finding"><div><b>Pathways:</b> ${m.pw.map((p) => `<span class="chip" data-pw="${esc(p)}">${esc(p)}</span>`).join(" ")}</div>
       <div><b>Compartments:</b> ${esc(m.c.join(", ") || "—")}</div>
       <div><b>Curated reactions:</b> ${m.nr} · supported by ${m.np} papers: ${m.pm.map(pubmed).join(", ")}</div>
@@ -210,19 +210,19 @@
   function geneticsHtml(mol) {
     const g = gnGet(mol);
     if (!GN.genes) return "";
-    if (!g) return `<h3>PD genetics</h3><p class="muted">No PD GWAS locus within 1 Mb, no GWAS Catalog PD association, not on the PD gene list.</p>`;
+    if (!g) return `<h3 id="detail-genetics">PD genetics</h3><p class="muted">No PD GWAS locus within 1 Mb, no GWAS Catalog PD association, not on the PD gene list.</p>`;
     const tags = [g.m ? `<span class="dir mixed">known PD gene</span>` : "", g.n ? `<span class="chip">nominated by Nalls 2019</span>` : ""].join(" ");
     const loci = g.l.map(([gw, name, snp, sc]) => `<div>${esc(gw)} · locus <b>${esc(name)}</b> (${esc(snp)}) · browser evidence score ${esc(sc)}</div>`).join("");
     const cat = g.c ? `<div><b>GWAS Catalog:</b> ${g.c[0]} genome-wide significant PD associations in ${g.c[3]} studies; strongest ${esc(g.c[2] || "")} p = ${esc(Number(g.c[1]).toPrecision(2))}${g.c[5].length ? ` · ${esc(g.c[5].join(", "))}` : ""} · ${g.c[4].map(pubmed).join(", ")}</div>` : "";
-    return `<h3>PD genetics</h3><div class="finding">${tags}${loci}${cat}<div class="ref">Locus proximity is not causality. ${esc(Object.values(GN.sources || {}).join(" · "))}</div></div>`;
+    return `<h3 id="detail-genetics">PD genetics</h3><div class="finding">${tags}${loci}${cat}<div class="ref">Locus proximity is not causality. ${esc(Object.values(GN.sources || {}).join(" · "))}</div></div>`;
   }
   function parkdbHtml(mol) {
     const g = pkGet(mol);
     if (!PK.genes) return "";
-    if (!g) return `<h3>ParkDB · prefrontal cortex RNA-seq</h3><p class="muted">Not differentially expressed in PD (padj ≥ 0.05 in both datasets) or not measured.</p>`;
+    if (!g) return `<h3 id="detail-parkdb">ParkDB · prefrontal cortex RNA-seq</h3><p class="muted">Not differentially expressed in PD (padj ≥ 0.05 in both datasets) or not measured.</p>`;
     const order = ["PD", "DLB", "MSA", "PSP", "CBD", "AD"];
     const rows = order.flatMap((d) => ["D1", "D2"].map((s) => [`${s}:${d}`, g.c[`${s}:${d}`]])).filter(([, v]) => v);
-    return `<h3>ParkDB · prefrontal cortex RNA-seq</h3>
+    return `<h3 id="detail-parkdb">ParkDB · prefrontal cortex RNA-seq</h3>
       <p class="muted">${g.rep ? "<b>Replicated PD change</b> (padj &lt; 0.05 in both datasets, same direction)." : "PD change not replicated across the two datasets."}
       log2FC &gt; 0 = higher in disease; bulk tissue.</p><table><thead><tr><th>Contrast</th><th>n</th><th>log2FC</th><th>padj</th></tr></thead><tbody>` +
       rows.map(([k, [lfc, q]]) => `<tr><td>${esc(k.replace("D1:", "Dataset 1 · ").replace("D2:", "Dataset 2 · "))} vs control</td><td class="muted">${esc((PK.groups[k] || []).join("/"))}</td>
@@ -318,6 +318,14 @@
     if (ti === T.markers) return showRegions([mk.rid[p.pointNumber]]);
   });
   document.body.addEventListener("click", (e) => {
+    const shortcut = e.target.closest("[data-evidence-section]");
+    if (shortcut) {
+      e.preventDefault();
+      const hash = shortcut.getAttribute("href");
+      if (location.hash === hash) fromHash();
+      else location.hash = hash;
+      return;
+    }
     const pw = e.target.closest("[data-pw]");
     if (pw) { setPathway(pw.dataset.pw); return; }
     const m = e.target.closest("[data-mol]");
@@ -455,6 +463,13 @@
     if (h.get("region")) { $("q").value = h.get("region"); onSearch(); }
     if (h.get("map") && (D.maps[h.get("map")] || ["molecule", "genetics"].includes(h.get("map")))) { state.map = h.get("map"); fillMapSelect(); recolor(); }
     if (h.get("view")) { $("view").value = h.get("view"); setView(h.get("view")); }
+    if (["genetics", "parkdb", "mechanisms"].includes(h.get("section"))) {
+      const target = document.getElementById(`detail-${h.get("section")}`);
+      if (target) {
+        const panel = $("panel");
+        panel.scrollTop += target.getBoundingClientRect().top - panel.getBoundingClientRect().top - 16;
+      }
+    }
   }
   window.addEventListener("hashchange", fromHash);
   fromHash();
