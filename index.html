@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PD Brain Atlas · Biomni-PD</title>
+<link rel="stylesheet" href="style.css">
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
+<script src="data.js"></script>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <h1>PD Brain Atlas</h1>
+    <p>Molecular findings from human Parkinson's disease brain tissue, mapped to the regions where they were measured</p>
+  </div>
+  <div class="search">
+    <input id="q" type="search" list="suggest" placeholder="Search a molecule (SNCA, GBA1, TH…) or a region (locus coeruleus, putamen…)" autocomplete="off">
+    <datalist id="suggest"></datalist>
+    <button id="clear" type="button">Clear</button>
+  </div>
+</header>
+
+<section class="controls" aria-label="Map controls">
+  <label>Colour regions by
+    <select id="map"></select>
+  </label>
+  <label>Mechanism
+    <select id="pathway"></select>
+  </label>
+  <label>View
+    <select id="view">
+      <option value="deep">Deep structures (glass cortex)</option>
+      <option value="lh_lat">Cortex (inflated): left lateral</option>
+      <option value="lh_med">Cortex (inflated): left medial</option>
+      <option value="rh_lat">Cortex (inflated): right lateral</option>
+      <option value="rh_med">Cortex (inflated): right medial</option>
+      <option value="top">Cortex (inflated): top</option>
+      <option value="bottom">Cortex (inflated): bottom</option>
+    </select>
+  </label>
+  <label>Cortex opacity
+    <input id="opacity" type="range" min="0" max="100" value="18">
+  </label>
+  <label class="check"><input id="showMarkers" type="checkbox" checked> Small nuclei markers</label>
+  <label class="check"><input id="showOutline" type="checkbox" checked> Brain outline</label>
+  <span id="stats" class="muted"></span>
+</section>
+
+<main>
+  <div class="viewer">
+    <div id="brain" role="img" aria-label="3D brain with PD evidence by region"></div>
+    <div id="legend" class="legend"></div>
+    <div class="outside">
+      <span class="muted">Outside the brain:</span>
+      <span id="outsideChips"></span>
+    </div>
+  </div>
+  <aside id="panel">
+    <div class="placeholder">
+      <h2>Start here</h2>
+      <ul>
+        <li><b>Click a region</b> on the brain to list the PD findings reported in it.</li>
+        <li><b>Search a molecule</b> to colour every region by the direction it was reported to change in (increased, decreased, no change).</li>
+        <li>Every published finding links to its PubMed entry. The sentence quoted from the abstract was checked automatically.</li>
+      </ul>
+      <p class="muted">Cortex is drawn on fsaverage5 and subcortex on MASSP (MNI152). Diamonds mark nuclei without a volumetric label at approximate positions, for navigation only.</p>
+    </div>
+  </aside>
+</main>
+
+<section class="tablewrap">
+  <div class="tablehead">
+    <h2>Findings</h2>
+    <div class="filters">
+      <select id="fSource">
+        <option value="">All sources</option>
+        <option value="literature">Published literature</option>
+        <option value="analysis">Biomni-PD analyses</option>
+      </select>
+      <select id="fDir">
+        <option value="">Any direction</option>
+        <option>increased</option><option>decreased</option><option>no change</option>
+        <option>present</option><option>altered</option>
+      </select>
+      <select id="fType"><option value="">Any molecule type</option></select>
+      <input id="fText" type="search" placeholder="Filter text…">
+      <button id="dl" type="button">Download TSV</button>
+    </div>
+  </div>
+  <div class="scroll">
+    <table id="tbl">
+      <thead><tr><th>Region</th><th>Molecule / feature</th><th>Type</th><th>Direction</th><th>Finding</th><th>Method</th><th>n (PD/ctrl)</th><th>Source</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+  <p id="tblCount" class="muted"></p>
+</section>
+
+<footer>
+  <p><b>How to read this.</b> Published findings come from human post-mortem PD studies, extracted from Europe PMC abstracts. Each one is kept only if its quoted sentence appears verbatim in the abstract. Mechanism pathways come from the PD map (LCSB, University of Luxembourg, CC BY 4.0). Imaging effect sizes are from ENIGMA-PD (Laansma et al. 2021), and Braak stage-related regions follow Keo et al. 2020. Region mapping is approximate wherever a paper reports a lobe or a broad area. Co-location of findings is an association, not evidence of mechanism. This site is for research use only, not for clinical use.</p>
+  <p id="sources" class="muted"></p>
+</footer>
+<script src="app.js"></script>
+</body>
+</html>
